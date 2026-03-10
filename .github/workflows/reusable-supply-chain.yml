@@ -3,69 +3,63 @@ name: "Reusable Supply Chain Security"
 on:
   workflow_call:
     inputs:
-      sbom_format:
-        description: "SBOM output format"
+      generate_sbom:
+        description: "Generate SBOM"
         required: false
-        type: string
-        default: "cyclonedx-json"
-      commit_artifacts:
-        description: "Commit SBOM/VEX to repo"
+        type: boolean
+        default: true
+      generate_slsa:
+        description: "Generate SLSA provenance"
         required: false
         type: boolean
         default: false
-      artifact_path:
-        description: "Path to store governance artifacts"
+      sbom_format:
+        description: "SBOM format"
         required: false
         type: string
-        default: "docs/governance"
+        default: "cyclonedx"
 
 jobs:
   supply-chain:
-    name: "Supply Chain Attestation"
+    name: "Supply Chain Audit"
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      id-token: write
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect project type
+        id: detect
+        run: |
+          HAS_DEPS=false
+          if [ -f "package.json" ] || [ -f "requirements.txt" ] || [ -f "go.mod" ] || [ -f "Cargo.toml" ] || [ -f "pyproject.toml" ] || [ -f "pom.xml" ]; then
+            HAS_DEPS=true
+          fi
+          echo "has_deps=$HAS_DEPS" >> "$GITHUB_OUTPUT"
+          echo "Dependency files detected: $HAS_DEPS"
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          format: ${{ inputs.sbom_format }}
-          output-file: ${{ inputs.artifact_path }}/sbom.json
-        continue-on-error: true
-
-      - name: Verify SLSA Compliance
+        if: inputs.generate_sbom && steps.detect.outputs.has_deps == 'true'
         run: |
-          echo "=== SLSA L3+ Compliance Check ==="
-          echo "Repository: ${{ github.repository }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Workflow: ${{ github.workflow }}"
-          echo "Runner: ${{ runner.os }}"
-          echo "SLSA L3+ verification: PASS (hermetic build environment)"
+          echo "=== Supply Chain: SBOM Generation ==="
+          # Install syft for SBOM
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true
 
-      - name: Generate VEX Statement
-        run: |
-          mkdir -p ${{ inputs.artifact_path }}
-          cat > ${{ inputs.artifact_path }}/vex.json << 'VEOF'
-          {
-            "@context": "https://openvex.dev/ns/v0.2.0",
-            "author": "${{ github.repository_owner }}",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "statements": []
-          }
-          VEOF
-          echo "VEX statement generated"
+          if command -v syft &>/dev/null; then
+            syft . -o cyclonedx-json=sbom.json 2>/dev/null || echo "::warning::SBOM generation completed with warnings"
+            if [ -f "sbom.json" ]; then
+              echo "SBOM generated: $(wc -c < sbom.json) bytes"
+            fi
+          else
+            echo "::warning::syft not available, skipping SBOM generation"
+          fi
 
-      - name: Commit artifacts
-        if: inputs.commit_artifacts && github.event_name == 'push'
+      - name: Supply chain summary
+        if: always()
         run: |
-          git config --global user.name "governance-bot"
-          git config --global user.email "governance@${{ github.repository_owner }}.io"
-          git add ${{ inputs.artifact_path }}/ 2>/dev/null || true
-          git commit -m "chore: update supply chain artifacts (SBOM, VEX)" || echo "No changes"
-          git push || echo "Push skipped"
+          echo "=== Supply Chain Audit Complete ==="
+          if [ -f "sbom.json" ]; then
+            echo "SBOM: generated"
+          else
+            echo "SBOM: skipped (no dependency files or tool unavailable)"
+          fi
+          # Always succeed
+          exit 0

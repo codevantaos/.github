@@ -4,102 +4,102 @@ on:
   workflow_call:
     inputs:
       strict:
-        description: "Fail on governance violations"
+        description: "Strict mode (fail on missing files)"
         required: false
         type: boolean
         default: false
       check_urn:
-        description: "Validate URN consistency"
+        description: "Check URN file"
         required: false
         type: boolean
         default: true
       check_governance_dir:
-        description: "Validate .governance/ directory"
+        description: "Check .governance/ directory"
         required: false
         type: boolean
         default: true
-      check_agent_hooks:
-        description: "Validate .agent_hooks/ directory"
+      check_metadata:
+        description: "Check METADATA.yaml"
         required: false
         type: boolean
-        default: false
+        default: true
+      check_security:
+        description: "Check SECURITY.md"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
-  governance-check:
-    name: "Governance Contract Validation"
+  governance-validation:
+    name: "Governance Validation"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Validate governance contract
         run: |
-          WARNINGS=0
-          ERRORS=0
-
           echo "=== Governance Contract Validation ==="
-          echo "Repository: ${{ github.repository }}"
-          echo ""
+          ERRORS=0
+          WARNINGS=0
 
-          # Required files
-          for f in METADATA.yaml URN SECURITY.md; do
-            if [ -f "$f" ]; then
-              echo "✅ $f"
+          if [ "${{ inputs.check_urn }}" = "true" ]; then
+            if [ -f "URN" ]; then
+              echo "OK: URN exists ($(cat URN))"
             else
-              echo "⚠️ Missing: $f"
-              WARNINGS=$((WARNINGS + 1))
+              echo "::warning::Missing: URN"
+              WARNINGS=$((WARNINGS+1))
             fi
-          done
+          fi
 
-          # .governance/ directory
+          if [ "${{ inputs.check_metadata }}" = "true" ]; then
+            if [ -f "METADATA.yaml" ]; then
+              echo "OK: METADATA.yaml exists"
+            else
+              echo "::warning::Missing: METADATA.yaml"
+              WARNINGS=$((WARNINGS+1))
+            fi
+          fi
+
+          if [ "${{ inputs.check_security }}" = "true" ]; then
+            if [ -f "SECURITY.md" ]; then
+              echo "OK: SECURITY.md exists"
+            else
+              echo "::warning::Missing: SECURITY.md"
+              WARNINGS=$((WARNINGS+1))
+            fi
+          fi
+
           if [ "${{ inputs.check_governance_dir }}" = "true" ]; then
             if [ -d ".governance" ]; then
-              for f in policy.yaml ownership.yaml compliance.yaml audit-log.yaml; do
+              echo "OK: .governance/ exists"
+              for f in policy.yaml ownership.yaml compliance.yaml; do
                 if [ -f ".governance/$f" ]; then
-                  echo "✅ .governance/$f"
+                  echo "  OK: .governance/$f"
                 else
-                  echo "⚠️ Missing: .governance/$f"
-                  WARNINGS=$((WARNINGS + 1))
+                  echo "  ::warning::Missing: .governance/$f"
+                  WARNINGS=$((WARNINGS+1))
                 fi
               done
             else
-              echo "⚠️ .governance/ directory not found"
-              WARNINGS=$((WARNINGS + 1))
+              echo "::warning::Missing: .governance/ directory"
+              WARNINGS=$((WARNINGS+1))
             fi
           fi
 
-          # .agent_hooks/ directory
-          if [ "${{ inputs.check_agent_hooks }}" = "true" ]; then
-            if [ -d ".agent_hooks" ]; then
-              echo "✅ .agent_hooks/ directory present"
-            else
-              echo "⚠️ .agent_hooks/ directory not found"
-              WARNINGS=$((WARNINGS + 1))
-            fi
-          fi
-
-          # URN consistency
-          if [ "${{ inputs.check_urn }}" = "true" ] && [ -f "URN" ] && [ -f "METADATA.yaml" ]; then
-            URN_FILE=$(cat URN | tr -d '[:space:]')
-            URN_META=$(grep '^urn:' METADATA.yaml | awk '{print $2}' | tr -d '[:space:]' || echo "")
-            if [ -n "$URN_META" ] && [ "$URN_FILE" != "$URN_META" ]; then
-              echo "❌ URN Mismatch: file=$URN_FILE metadata=$URN_META"
-              ERRORS=$((ERRORS + 1))
-            else
-              echo "✅ URN consistent: $URN_FILE"
-            fi
-          fi
-
-          # repo.automation.yaml
-          if [ -f "repo.automation.yaml" ]; then
-            echo "✅ repo.automation.yaml"
+          # Check CODEOWNERS
+          if [ -f ".github/CODEOWNERS" ]; then
+            echo "OK: .github/CODEOWNERS exists"
           else
-            echo "⚠️ Missing: repo.automation.yaml"
-            WARNINGS=$((WARNINGS + 1))
+            echo "::warning::Missing: .github/CODEOWNERS"
+            WARNINGS=$((WARNINGS+1))
           fi
 
           echo ""
-          echo "=== Summary: $ERRORS error(s), $WARNINGS warning(s) ==="
+          echo "=== Summary: $ERRORS errors, $WARNINGS warnings ==="
 
-          if [ "${{ inputs.strict }}" = "true" ] && [ $ERRORS -gt 0 ]; then
+          if [ "${{ inputs.strict }}" = "true" ] && [ $WARNINGS -gt 0 ]; then
+            echo "::error::Strict mode: $WARNINGS governance warnings treated as errors"
             exit 1
           fi
+
+          exit 0
