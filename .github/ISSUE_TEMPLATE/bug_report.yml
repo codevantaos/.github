@@ -1,0 +1,65 @@
+name: 🐛 Bug Report
+description: Report a bug in CodeVantaOS platform
+title: "[BUG] "
+labels: ["bug", "triage"]
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected Layer
+      options:
+        - infra-base (Infrastructure)
+        - core-main (Core Platform)
+        - core-kernel (CI/CD)
+        - app-vercel (Web Portal)
+        - mod-platform (Modules)
+        - ops-observability (Observability)
+        - .github (Shared Workflows)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear description of the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step reproduction
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (system down)
+        - High (major feature broken)
+        - Medium (workaround available)
+        - Low (cosmetic)
+    validations:
+      required: true

@@ -1,0 +1,68 @@
+name: 🛡️ Governance Violation
+description: Report a governance or compliance violation
+title: "[GOV] "
+labels: ["governance", "compliance", "priority:high"]
+body:
+  - type: dropdown
+    id: violation_type
+    attributes:
+      label: Violation Type
+      options:
+        - URN Mismatch
+        - Policy Violation
+        - Security Finding
+        - Supply Chain Anomaly
+        - Compliance Drift
+        - Branch Protection Bypass
+        - Unauthorized Access
+    validations:
+      required: true
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected Repository
+      options:
+        - infra-base
+        - core-main
+        - core-kernel
+        - app-vercel
+        - mod-platform
+        - ops-observability
+        - Organization-wide
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Violation Description
+      description: Detailed description of the governance violation
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, workflow run URLs
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auto_detected
+    attributes:
+      label: Detection Method
+      options:
+        - Automated (CI/CD pipeline)
+        - Automated (scheduled scan)
+        - Manual review
+        - External report
+    validations:
+      required: true
+
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Suggested Remediation
+      description: Steps to resolve the violation

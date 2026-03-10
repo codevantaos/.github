@@ -1,0 +1,62 @@
+name: Reusable Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      severity:
+        description: 'Minimum severity to fail on (CRITICAL, HIGH, MEDIUM, LOW)'
+        required: false
+        type: string
+        default: 'CRITICAL,HIGH'
+      scan_type:
+        description: 'Scan type (fs, image, repo)'
+        required: false
+        type: string
+        default: 'fs'
+      enable_codeql:
+        description: 'Enable CodeQL analysis'
+        required: false
+        type: boolean
+        default: true
+      codeql_languages:
+        description: 'Comma-separated CodeQL languages'
+        required: false
+        type: string
+        default: 'actions'
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@062f25973d4520374f107f9630607373d5497016
+        with:
+          scan-type: ${{ inputs.scan_type }}
+          format: 'table'
+          exit-code: '1'
+          severity: ${{ inputs.severity }}
+
+  codeql-analyze:
+    if: inputs.enable_codeql
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ inputs.codeql_languages }}
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4

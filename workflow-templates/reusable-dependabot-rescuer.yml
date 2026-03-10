@@ -1,0 +1,45 @@
+name: Reusable Dependabot PR Rescuer
+
+on:
+  workflow_call:
+    inputs:
+      repair_factory_repo:
+        description: 'Central repair factory repository name'
+        required: false
+        type: string
+        default: 'infra-base'
+      event_type:
+        description: 'Dispatch event type'
+        required: false
+        type: string
+        default: 'dependabot-pr-stuck'
+    secrets:
+      dispatch_token:
+        description: 'PAT with repo dispatch permissions'
+        required: true
+
+jobs:
+  dispatch_to_repair_factory:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      actions: write
+    steps:
+      - name: Dispatch to Central Repair Factory
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.dispatch_token }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'codevantaos',
+              repo: '${{ inputs.repair_factory_repo }}',
+              event_type: '${{ inputs.event_type }}',
+              client_payload: {
+                repository: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                pull_request_head_sha: context.payload.pull_request.head.sha
+              }
+            });
+            console.log(`Dispatched ${context.repo.repo} PR #${context.payload.pull_request.number} to repair factory.`);

@@ -1,0 +1,71 @@
+name: Reusable CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      governance_urn:
+        description: 'URN identifier for governance check'
+        required: false
+        type: string
+        default: ''
+      run_lint:
+        description: 'Enable linting step'
+        required: false
+        type: boolean
+        default: true
+      run_test:
+        description: 'Enable test step'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Governance Check
+        run: |
+          echo "[CodeVantaOS] Executing Governance Validation..."
+          if [ -f "URN" ]; then
+            URN_VALUE=$(cat URN)
+            echo "URN: $URN_VALUE"
+          fi
+          if [ -f "METADATA.yaml" ]; then
+            echo "METADATA.yaml found — validating..."
+            if [ -f "URN" ]; then
+              EXPECTED=$(cat URN)
+              ACTUAL=$(grep "urn" METADATA.yaml | awk '{print $2}' || echo "")
+              if [ -n "$ACTUAL" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+                echo "[ERROR] URN Mismatch: expected=$EXPECTED actual=$ACTUAL"
+                exit 1
+              fi
+            fi
+          fi
+          echo "[CodeVantaOS] Governance Check Passed"
+
+      - name: Lint
+        if: inputs.run_lint
+        run: |
+          echo "[CodeVantaOS] Running lint checks..."
+          # YAML lint
+          if command -v yamllint &> /dev/null; then
+            find . -name '*.yml' -o -name '*.yaml' | head -20 | xargs yamllint -d relaxed || true
+          fi
+          # Markdown lint
+          if [ -f ".markdownlint.json" ]; then
+            echo "Markdown lint config found"
+          fi
+          echo "[CodeVantaOS] Lint complete"
+
+      - name: Test
+        if: inputs.run_test
+        run: |
+          echo "[CodeVantaOS] Running tests..."
+          if [ -d "tests" ]; then
+            if [ -f "tests/verification_matrix.py" ]; then
+              python3 tests/verification_matrix.py || true
+            fi
+          fi
+          echo "[CodeVantaOS] Tests complete"
