@@ -1,45 +1,62 @@
-name: Reusable Dependabot PR Rescuer
+name: "Reusable Dependabot Rescuer"
 
 on:
   workflow_call:
     inputs:
-      repair_factory_repo:
-        description: 'Central repair factory repository name'
+      dispatch_repo:
+        description: "Repository to dispatch repair events to (empty = skip dispatch)"
         required: false
         type: string
-        default: 'infra-base'
-      event_type:
-        description: 'Dispatch event type'
+        default: ""
+      auto_approve:
+        description: "Auto-approve patch/minor dependabot PRs"
         required: false
-        type: string
-        default: 'dependabot-pr-stuck'
-    secrets:
-      dispatch_token:
-        description: 'PAT with repo dispatch permissions'
-        required: true
+        type: boolean
+        default: false
 
 jobs:
-  dispatch_to_repair_factory:
+  rescue:
+    name: "Dependabot PR Rescue"
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
       contents: write
-      actions: write
     steps:
-      - name: Dispatch to Central Repair Factory
+      - uses: actions/checkout@v4
+
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-approve minor/patch updates
+        if: inputs.auto_approve && (steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dispatch to repair factory
+        if: inputs.dispatch_repo != ''
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.dispatch_token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.repos.createDispatchEvent({
-              owner: 'codevantaos',
-              repo: '${{ inputs.repair_factory_repo }}',
-              event_type: '${{ inputs.event_type }}',
-              client_payload: {
-                repository: context.repo.repo,
-                pull_number: context.payload.pull_request.number,
-                pull_request_head_sha: context.payload.pull_request.head.sha
-              }
-            });
-            console.log(`Dispatched ${context.repo.repo} PR #${context.payload.pull_request.number} to repair factory.`);
+            const [owner, repo] = '${{ inputs.dispatch_repo }}'.split('/');
+            try {
+              await github.rest.repos.createDispatchEvent({
+                owner: owner || context.repo.owner,
+                repo: repo,
+                event_type: 'dependabot-pr-stuck',
+                client_payload: {
+                  repository: context.repo.repo,
+                  pull_number: context.payload.pull_request.number,
+                  pull_request_head_sha: context.payload.pull_request.head.sha
+                }
+              });
+              console.log(`Dispatched to ${owner}/${repo}`);
+            } catch (e) {
+              console.log(`Dispatch skipped: ${e.message}`);
+            }

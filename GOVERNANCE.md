@@ -1,23 +1,22 @@
-# CodeVantaOS Governance Framework
+# Organization Governance Framework
 
 ## Layered Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ops-observability    Observability & Monitoring     │
-├─────────────────────────────────────────────────────┤
-│  mod-platform         Quantum / Cognitive / Multi    │
-├─────────────────────────────────────────────────────┤
-│  app-vercel           Web Portal (Vercel)            │
-├─────────────────────────────────────────────────────┤
-│  core-main            Platform Core + Control Plane  │
-│  core-kernel          CI/CD Workflows Engine         │
-├─────────────────────────────────────────────────────┤
-│  infra-base           Infrastructure Foundation      │
-├─────────────────────────────────────────────────────┤
-│  .github              Shared Workflows & Governance  │
-│  .github-private      Profile Statistics             │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  ops-observability    Observability & Monitoring             │
+├─────────────────────────────────────────────────────────────┤
+│  mod-platform         Quantum / Cognitive / Multimodal      │
+├─────────────────────────────────────────────────────────────┤
+│  app-vercel           Web Portal (Vercel)                   │
+├─────────────────────────────────────────────────────────────┤
+│  core-main            Platform Core + Control Plane         │
+│  core-kernel          CI/CD Workflows Engine                │
+├─────────────────────────────────────────────────────────────┤
+│  infra-base           Infrastructure Foundation             │
+├─────────────────────────────────────────────────────────────┤
+│  .github              Shared Workflows & Governance         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Repository Naming Convention
@@ -55,49 +54,46 @@ repo/
 
 ## Reusable Workflows
 
-Shared workflows are defined in `.github/workflow-templates/`:
+Shared workflows in `.github/workflows/` — **always pin to `@v1`**:
 
 | Workflow | Purpose | Trigger |
 |---|---|---|
-| `reusable-ci.yml` | Governance validation, lint, test | `push`, `pull_request` |
-| `reusable-security-scan.yml` | Trivy + CodeQL scanning | `push`, `pull_request` |
-| `reusable-supply-chain.yml` | SBOM, SLSA, VEX generation | `push` |
-| `reusable-self-healing.yml` | Auto-remediation on vulnerability | `push`, `schedule` |
-| `reusable-dependabot-rescuer.yml` | Dependabot PR dispatch | `pull_request` |
+| `reusable-ci.yml` | Governance validation, lint, test | `workflow_call` |
+| `reusable-security-scan.yml` | Trivy + CodeQL scanning | `workflow_call` |
+| `reusable-supply-chain.yml` | SBOM, SLSA, VEX generation | `workflow_call` |
+| `reusable-self-healing.yml` | Auto-remediation on vulnerability | `workflow_call` |
+| `reusable-dependabot-rescuer.yml` | Dependabot PR dispatch | `workflow_call` |
+| `reusable-governance-check.yml` | Governance contract validation | `workflow_call` |
 
 ### Usage Example
 
 ```yaml
-# In any repo's .github/workflows/ci.yml
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
 jobs:
   ci:
-    uses: codevantaos/.github/.github/workflows/reusable-ci.yml@main
+    uses: codevantaos/.github/.github/workflows/reusable-ci.yml@v1
     with:
       run_lint: true
       run_test: true
 
   security:
-    uses: codevantaos/.github/.github/workflows/reusable-security-scan.yml@main
+    uses: codevantaos/.github/.github/workflows/reusable-security-scan.yml@v1
     with:
-      severity: 'CRITICAL,HIGH'
-      enable_codeql: true
+      severity: "CRITICAL,HIGH"
 
-  supply-chain:
-    uses: codevantaos/.github/.github/workflows/reusable-supply-chain.yml@main
+  governance:
+    uses: codevantaos/.github/.github/workflows/reusable-governance-check.yml@v1
     with:
-      commit_artifacts: false
+      strict: false
 ```
 
-## Governance Events
+## Version Policy
 
-All governance-significant events are tracked:
+- All shared workflows MUST be referenced with version tags (`@v1`)
+- Breaking changes require a new major version (`@v2`)
+- `@main` references are **prohibited** in production repos
+- New versions are canary-tested on 1-2 repos before org-wide rollout
+
+## Governance Events
 
 1. **Policy Violations** → Issue created automatically
 2. **Security Findings** → Self-healing triggered

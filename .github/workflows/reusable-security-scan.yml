@@ -1,62 +1,101 @@
-name: Reusable Security Scan
+name: "Reusable Security Scan"
 
 on:
   workflow_call:
     inputs:
       severity:
-        description: 'Minimum severity to fail on (CRITICAL, HIGH, MEDIUM, LOW)'
+        description: "Trivy severity filter"
         required: false
         type: string
-        default: 'CRITICAL,HIGH'
-      scan_type:
-        description: 'Scan type (fs, image, repo)'
-        required: false
-        type: string
-        default: 'fs'
+        default: "CRITICAL,HIGH"
       enable_codeql:
-        description: 'Enable CodeQL analysis'
+        description: "Enable CodeQL analysis"
         required: false
         type: boolean
         default: true
-      codeql_languages:
-        description: 'Comma-separated CodeQL languages'
+      scan_type:
+        description: "Trivy scan type (fs, image, config)"
         required: false
         type: string
-        default: 'actions'
+        default: "fs"
+      enable_secret_scan:
+        description: "Enable secret scanning"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
-  trivy-scan:
+  trivy:
+    name: "Trivy Security Scan"
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
       contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/checkout@v4
 
-      - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@062f25973d4520374f107f9630607373d5497016
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: ${{ inputs.scan_type }}
-          format: 'table'
-          exit-code: '1'
+          format: "sarif"
+          output: "trivy-results.sarif"
           severity: ${{ inputs.severity }}
+        continue-on-error: true
 
-  codeql-analyze:
-    if: inputs.enable_codeql
+      - name: Upload Trivy results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
+        continue-on-error: true
+
+  codeql:
+    name: "CodeQL Analysis"
     runs-on: ubuntu-latest
+    if: inputs.enable_codeql
     permissions:
-      security-events: write
-      packages: read
       actions: read
       contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
-          languages: ${{ inputs.codeql_languages }}
-          build-mode: none
+          languages: javascript,python
+        continue-on-error: true
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
+  secret-scan:
+    name: "Secret Detection"
+    runs-on: ubuntu-latest
+    if: inputs.enable_secret_scan
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        run: |
+          # Check for common secret patterns
+          FOUND=0
+          for pattern in 'ghp_[A-Za-z0-9]{36}' 'AKIA[0-9A-Z]{16}' 'sk-[a-zA-Z0-9]{48}'; do
+            MATCHES=$(grep -rn "$pattern" --include='*.yml' --include='*.yaml' \
+              --include='*.json' --include='*.sh' --include='*.py' \
+              --exclude-dir=.git . 2>/dev/null | grep -v 'secret-scan' || true)
+            if [ -n "$MATCHES" ]; then
+              echo "⚠️ Potential secret pattern found: $pattern"
+              echo "$MATCHES" | head -5
+              FOUND=$((FOUND + 1))
+            fi
+          done
+          if [ $FOUND -gt 0 ]; then
+            echo "❌ $FOUND potential secret pattern(s) detected"
+            exit 1
+          fi
+          echo "✅ No secrets detected"

@@ -1,43 +1,28 @@
-# Security Policy — CodeVantaOS
+# Security Policy
 
-## Supported Versions
+## Reporting Vulnerabilities
 
-| Repository | Version | Supported |
-|---|---|---|
-| infra-base | main | ✅ |
-| core-main | main | ✅ |
-| core-kernel | main | ✅ |
-| app-vercel | main | ✅ |
-| mod-platform | main | ✅ |
-| ops-observability | main | ✅ |
+If you discover a security vulnerability, please report it responsibly:
 
-## Reporting a Vulnerability
-
-1. **DO NOT** open a public issue for security vulnerabilities
-2. Email: security@codevantaos.com
+1. **DO NOT** create a public GitHub issue
+2. Email: security@codevantaos.io
 3. Include: repository name, description, reproduction steps, impact assessment
-4. Expected response time: 48 hours
 
-## Security Measures
+## Standards
 
-### Automated Scanning
-- **Trivy**: Filesystem vulnerability scanning on every push/PR
-- **CodeQL**: Static analysis for code quality and security
-- **Grype**: Container image scanning
-- **SBOM**: Software Bill of Materials generated per release
+| Standard | Status |
+|---|---|
+| SLSA Level | L3+ |
+| SBOM Format | CycloneDX |
+| Signing | Sigstore |
+| Secret Scanning | Enabled |
+| Dependency Scanning | Enabled |
 
-### Supply Chain Security
-- **SLSA L3+**: Provenance verification for all builds
-- **VEX**: Vulnerability Exploitability eXchange statements
-- **Sigstore**: Artifact signing and verification
-- **Dependabot**: Automated dependency updates with rescue workflow
+## Response SLA
 
-### Branch Protection
-- Required status checks (CodeQL, Trivy, Grype, Code Quality Gate)
-- Required pull request reviews
-- No direct pushes to `main`
-
-### Secret Management
-- Organization-level secrets via GitHub Secrets
-- PAT expiry monitoring (`pat-expiry-check.yml`)
-- Secret rotation automation (`secret-rotation-service`)
+| Severity | Response | Resolution |
+|---|---|---|
+| Critical (P0) | 15 min | 4 hours |
+| High (P1) | 1 hour | 24 hours |
+| Medium (P2) | 4 hours | 7 days |
+| Low (P3) | 24 hours | 30 days |

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "repo.automation.yaml Schema",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"type": "string", "pattern": "^automation\\.codevantaos\\.io/v\\d+$"},
+    "kind": {"type": "string", "enum": ["RepoAutomation"]},
+    "metadata": {
+      "type": "object",
+      "required": ["name", "layer", "urn"],
+      "properties": {
+        "name": {"type": "string"},
+        "layer": {"type": "string", "enum": ["infra", "core", "app", "mod", "ops"]},
+        "urn": {"type": "string", "pattern": "^urn:codevantaos:"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "ci": {"type": "object"},
+        "dependabot": {"type": "object"},
+        "branches": {"type": "object"},
+        "labels": {"type": "object"},
+        "stale": {"type": "object"},
+        "notifications": {"type": "object"}
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+brand_replacements:
+  description: Brand names to be replaced with neutral/parameterized equivalents
+  rules:
+  - old: indestructibleorg
+    new: ${{ github.repository_owner }}
+    type: org-name
+    context: workflow uses
+  - old: indestructible
+    new: ${ORG_NAME}
+    type: brand
+    context: scripts, configs
+  - old: codevantaceo
+    new: ${{ github.repository_owner }}
+    type: personal-account
+    context: all
+  - old: codevantaos
+    new: ${ORG_NAME}
+    type: org-name
+    context: configs, metadata
+  - old: CodeVantaOS
+    new: ${PLATFORM_NAME}
+    type: platform-name
+    context: display names, docs
+  - old: CodeVanta
+    new: ${PLATFORM_NAME}
+    type: platform-name
+    context: display names
+  - old: VantaOS
+    new: ${PLATFORM_NAME}
+    type: platform-name
+    context: display names
+  - old: vantaos
+    new: ${PLATFORM_NAME_LOWER}
+    type: platform-name
+    context: URNs, identifiers
+  - old: axiom
+    new: ${LEGACY_PREFIX}
+    type: legacy-brand
+    context: scripts
+  - old: AXIOM
+    new: ${LEGACY_PREFIX_UPPER}
+    type: legacy-brand
+    context: scripts
+  - old: softwareweb
+    new: ${APP_NAME}
+    type: legacy-brand
+    context: configs
+  - old: AutoOps
+    new: ${PLATFORM_NAME}
+    type: legacy-brand
+    context: scripts
+  - old: autoops
+    new: ${PLATFORM_NAME_LOWER}
+    type: legacy-brand
+    context: scripts
+workflow_uses_replacements:
+  description: Workflow uses references to be updated
+  rules:
+  - old: indestructibleorg/checkout-action@1234567890abcdef1234567890abcdef12345678
+    new: actions/checkout@v4
+    type: action-ref
+  - old: indestructibleorg/my-action@1.0.0
+    new: REMOVE_OR_REPLACE
+    type: action-ref
+  - old: indestructibleorg/my-action@<full-sha>
+    new: REMOVE_OR_REPLACE
+    type: action-ref
+  - old: codevantaos/.github/.github/workflows/reusable-ci.yml@main
+    new: codevantaos/.github/.github/workflows/reusable-ci.yml@v1
+    type: version-pin
+  - old: codevantaos/.github/.github/workflows/reusable-security-scan.yml@main
+    new: codevantaos/.github/.github/workflows/reusable-security-scan.yml@v1
+    type: version-pin
+  - old: codevantaos/.github/.github/workflows/reusable-supply-chain.yml@main
+    new: codevantaos/.github/.github/workflows/reusable-supply-chain.yml@v1
+    type: version-pin
+path_replacements:
+  description: Hardcoded paths to be parameterized
+  rules:
+  - old: /home/ubuntu/codevantaos-
+    new: ${REPO_ROOT}/
+    type: path
+  - old: .agent_hooks/repair/auto-repair.sh
+    new: CONDITIONAL_EXEC
+    type: hook-path
+  - old: .agent_hooks/validation/check.sh
+    new: CONDITIONAL_EXEC
+    type: hook-path

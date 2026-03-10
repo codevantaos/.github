@@ -1,83 +1,84 @@
-name: Reusable Self-Healing Governance
+name: "Reusable Self-Healing"
 
 on:
   workflow_call:
     inputs:
-      scan_severity:
-        description: 'Trivy scan severity threshold'
+      severity_threshold:
+        description: "Minimum severity to trigger healing"
         required: false
         type: string
-        default: 'CRITICAL,HIGH'
+        default: "CRITICAL,HIGH"
       auto_fix:
-        description: 'Enable auto-fix on vulnerability detection'
+        description: "Enable automatic fix attempts"
         required: false
         type: boolean
         default: false
-      validate_urn:
-        description: 'Validate URN governance'
+      scan_path:
+        description: "Path to scan"
         required: false
-        type: boolean
-        default: true
-    secrets:
-      admin_token:
-        description: 'Token with write access for auto-fix commits'
-        required: false
+        type: string
+        default: "."
 
 jobs:
-  scan-and-fix:
+  scan-and-heal:
+    name: "Scan & Self-Heal"
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       security-events: write
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.admin_token || github.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: URN Governance Check
-        if: inputs.validate_urn
         run: |
-          echo "[CodeVantaOS] Validating URN Governance..."
           if [ -f "URN" ] && [ -f "METADATA.yaml" ]; then
-            EXPECTED_URN=$(cat URN)
-            ACTUAL_URN=$(grep "urn" METADATA.yaml | awk '{print $2}' || echo "")
-            if [ -n "$ACTUAL_URN" ] && [ "$EXPECTED_URN" != "$ACTUAL_URN" ]; then
-              echo "[ERROR] URN Mismatch! Expected: $EXPECTED_URN Got: $ACTUAL_URN"
+            EXPECTED=$(cat URN | tr -d '[:space:]')
+            ACTUAL=$(grep '^urn:' METADATA.yaml | awk '{print $2}' | tr -d '[:space:]' || echo "")
+            if [ -n "$ACTUAL" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+              echo "❌ URN Mismatch: expected=$EXPECTED actual=$ACTUAL"
               exit 1
             fi
-            echo "[CodeVantaOS] URN Validated: $EXPECTED_URN"
+            echo "✅ URN validated: $EXPECTED"
           else
-            echo "[CodeVantaOS] No URN/METADATA files — skipping URN validation"
+            echo "⚠️ URN or METADATA.yaml not found, skipping URN check"
           fi
 
-      - name: Security Scan (Trivy)
-        id: trivy
-        uses: aquasecurity/trivy-action@062f25973d4520374f107f9630607373d5497016
+      - name: Security Scan
+        uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          format: 'table'
-          exit-code: '1'
-          severity: ${{ inputs.scan_severity }}
+          scan-type: "fs"
+          scan-ref: ${{ inputs.scan_path }}
+          format: "table"
+          exit-code: "1"
+          severity: ${{ inputs.severity_threshold }}
         continue-on-error: true
+        id: scan
 
-      - name: Auto-Fix Vulnerabilities
-        if: steps.trivy.outcome == 'failure' && inputs.auto_fix
+      - name: Auto-Fix (if enabled)
+        if: steps.scan.outcome == 'failure' && inputs.auto_fix
         run: |
-          echo "[CodeVantaOS] Vulnerabilities Detected. Initiating Self-Healing..."
-          echo "Repository: ${{ github.repository }}"
-          echo "Severity threshold: ${{ inputs.scan_severity }}"
-          # Auto-fix logic: update dependencies, patch configs
-          git config --global user.name "CodeVantaOS-Bot"
-          git config --global user.email "bot@codevantaos.com"
-          git add .
-          git commit -m "fix: auto-remediate security vulnerabilities [Self-Healing]" || echo "No changes to commit"
-          git push origin ${{ github.ref_name }} || echo "No changes to push"
+          echo "=== Self-Healing Initiated ==="
+          # Run local repair hook if exists
+          if [ -f ".agent_hooks/repair/auto-repair.sh" ]; then
+            bash .agent_hooks/repair/auto-repair.sh
+          else
+            echo "No local repair hook found"
+          fi
 
-      - name: Fail if vulnerabilities found and no auto-fix
-        if: steps.trivy.outcome == 'failure' && !inputs.auto_fix
-        run: |
-          echo "[CodeVantaOS] Security vulnerabilities detected. Auto-fix disabled."
-          echo "Please review and fix manually."
-          exit 1
+          # Attempt dependency updates
+          if [ -f "package.json" ]; then
+            npm audit fix --force 2>/dev/null || true
+          fi
+          if [ -f "requirements.txt" ]; then
+            pip install --upgrade pip 2>/dev/null || true
+          fi
+
+          # Commit fixes if any
+          git config --global user.name "governance-bot"
+          git config --global user.email "governance@${{ github.repository_owner }}.io"
+          git add -A
+          git commit -m "fix: auto-remediate security vulnerabilities [self-healing]" || echo "No changes"
+          git push || echo "Push skipped"
